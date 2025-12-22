@@ -1,0 +1,49 @@
+<div class="filter-panel">
+  <button class="filter-toggle" (click)="toggleFilters()">
+    {{ showFilters ? 'Hide' : 'Show' }} Filters
+  </button>
+
+  <div *ngIf="showFilters" class="filter-content">
+    <div class="filter-row">
+      <label>
+        Type:
+        <input
+          type="text"
+          [(ngModel)]="localFilter.type"
+          placeholder="Filter by type">
+      </label>
+
+      <label>
+        Search:
+        <input
+          type="text"
+          [(ngModel)]="localFilter.search"
+          placeholder="Search metrics">
+      </label>
+    </div>
+
+    <div class="filter-row">
+      <label>
+        From Date:
+        <input
+          type="datetime-local"
+          [value]="localFilter.fromDate ? (localFilter.fromDate | date:'yyyy-MM-ddTHH:mm') : ''"
+          (change)="onFromDateChange($event)">
+      </label>
+
+      <label>
+        To Date:
+        <input
+          type="datetime-local"
+          [value]="localFilter.toDate ? (localFilter.toDate | date:'yyyy-MM-ddTHH:mm') : ''"
+          (change)="onToDateChange($event)">
+      </label>
+    </div>
+
+    <div class="filter-actions">
+      <button class="btn-apply" (click)="applyFilters()">Apply Filters</button>
+      <button class="btn-clear" (click)="clearFilters()">Clear</button>
+    </div>
+  </div>
+</div>
+

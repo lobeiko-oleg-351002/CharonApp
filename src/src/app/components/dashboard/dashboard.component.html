@@ -1,0 +1,45 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h2>Metrics Dashboard</h2>
+    <button class="refresh-btn" (click)="refresh()" [disabled]="loading">
+      <span *ngIf="!loading">🔄 Refresh</span>
+      <span *ngIf="loading">Loading...</span>
+    </button>
+  </div>
+
+  <div *ngIf="error" class="error-message">
+    {{ error }}
+  </div>
+
+  <app-filter-panel
+    [filter]="filter"
+    (filterChange)="onFilterChange($event)">
+  </app-filter-panel>
+
+  <div class="dashboard-grid">
+    <div class="dashboard-card latest-values-card">
+      <h3>Latest Values</h3>
+      <app-latest-values
+        [metrics]="latestMetrics"
+        [loading]="loading">
+      </app-latest-values>
+    </div>
+
+    <div class="dashboard-card chart-card">
+      <h3>Metrics Chart</h3>
+      <app-metrics-chart
+        [metrics]="latestMetrics"
+        [loading]="loading">
+      </app-metrics-chart>
+    </div>
+
+    <div class="dashboard-card aggregations-card">
+      <h3>Aggregations</h3>
+      <app-aggregations
+        [aggregation]="aggregation"
+        [loading]="loading">
+      </app-aggregations>
+    </div>
+  </div>
+</div>
+

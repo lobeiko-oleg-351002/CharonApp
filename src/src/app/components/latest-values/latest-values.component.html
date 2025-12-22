@@ -1,0 +1,27 @@
+<div class="latest-values">
+  <div *ngIf="loading" class="loading">
+    Loading metrics...
+  </div>
+
+  <div *ngIf="!loading && metrics.length === 0" class="empty-state">
+    No metrics available
+  </div>
+
+  <div *ngIf="!loading && metrics.length > 0" class="metrics-list">
+    <div *ngFor="let metric of metrics" class="metric-item">
+      <div class="metric-header">
+        <span class="metric-type">{{ metric.type }}</span>
+        <span class="metric-time">{{ metric.createdAt | date:'short' }}</span>
+      </div>
+      <div class="metric-name">{{ metric.name }}</div>
+      <div class="metric-value">{{ getPayloadValue(metric) }}</div>
+      <div class="metric-payload" *ngIf="hasMultiplePayloadKeys(metric.payload)">
+        <details>
+          <summary>View Details</summary>
+          <pre>{{ metric.payload | json }}</pre>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+

@@ -1,0 +1,18 @@
+<div class="chart-container">
+  <div *ngIf="loading" class="loading">
+    Loading chart data...
+  </div>
+
+  <div *ngIf="!loading && (!metrics || metrics.length === 0)" class="empty-state">
+    No data available for chart
+  </div>
+
+  <div *ngIf="!loading && metrics && metrics.length > 0" class="chart-wrapper">
+    <canvas baseChart
+      [type]="chartType"
+      [data]="chartData"
+      [options]="chartOptions">
+    </canvas>
+  </div>
+</div>
+

@@ -1,0 +1,13 @@
+<div class="app-container">
+  <header class="app-header">
+    <h1>{{ title }}</h1>
+    <div class="connection-status" [class.connected]="signalRService.isConnected$ | async">
+      <span class="status-indicator"></span>
+      <span>{{ (signalRService.isConnected$ | async) ? 'Connected' : 'Disconnected' }}</span>
+    </div>
+  </header>
+  <main class="app-main">
+    <router-outlet></router-outlet>
+  </main>
+</div>
+

@@ -1,0 +1,35 @@
+<div class="aggregations">
+  <div *ngIf="loading" class="loading">
+    Loading aggregations...
+  </div>
+
+  <div *ngIf="!loading && !aggregation" class="empty-state">
+    No aggregation data available
+  </div>
+
+  <div *ngIf="!loading && aggregation" class="aggregation-content">
+    <div class="total-count">
+      <span class="label">Total Metrics:</span>
+      <span class="value">{{ aggregation.totalCount }}</span>
+    </div>
+
+    <div class="type-breakdown">
+      <h4>By Type</h4>
+      <div class="type-list">
+        <div *ngFor="let typeAgg of aggregation.typeAggregations" class="type-item">
+          <div class="type-header">
+            <span class="type-name">{{ typeAgg.type || 'Unknown' }}</span>
+            <span class="type-count">{{ typeAgg.count }}</span>
+          </div>
+          <div class="type-bar">
+            <div
+              class="type-bar-fill"
+              [style.width.%]="(typeAgg.count / aggregation.totalCount) * 100">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
