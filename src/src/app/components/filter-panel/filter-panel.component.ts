@@ -34,18 +34,6 @@ export class FilterPanelComponent implements OnInit {
     this.filterChange.emit({});
   }
 
-  onFromDateChange(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    this.localFilter.fromDate = target.value ? new Date(target.value) : undefined;
-    this.onDateChange();
-  }
-
-  onToDateChange(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    this.localFilter.toDate = target.value ? new Date(target.value) : undefined;
-    this.onDateChange();
-  }
-
   onDateChange(): void {
     if (this.localFilter.fromDate && this.localFilter.toDate) {
       if (this.localFilter.fromDate > this.localFilter.toDate) {

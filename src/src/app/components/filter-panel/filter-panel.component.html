@@ -28,7 +28,7 @@
         <input
           type="datetime-local"
           [value]="localFilter.fromDate ? (localFilter.fromDate | date:'yyyy-MM-ddTHH:mm') : ''"
-          (change)="onFromDateChange($event)">
+          (change)="onDateChange()">
       </label>
 
       <label>
@@ -36,7 +36,7 @@
         <input
           type="datetime-local"
           [value]="localFilter.toDate ? (localFilter.toDate | date:'yyyy-MM-ddTHH:mm') : ''"
-          (change)="onToDateChange($event)">
+          (change)="onDateChange()">
       </label>
     </div>
 
