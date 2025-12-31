@@ -6,7 +6,7 @@
 .loading, .empty-state {
   text-align: center;
   padding: 2rem;
-  color: #6b7280;
+  color: rgba(212, 175, 55, 0.7);
 }
 
 .metrics-list {
@@ -16,14 +16,16 @@
 }
 
 .metric-item {
-  background-color: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, rgba(26, 26, 46, 0.6) 0%, rgba(45, 27, 61, 0.6) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.2);
   border-radius: 0.5rem;
   padding: 1rem;
-  transition: box-shadow 0.2s;
+  transition: all 0.2s;
 
   &:hover {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+    border-color: rgba(212, 175, 55, 0.4);
+    transform: translateY(-2px);
   }
 }
 
@@ -35,30 +37,33 @@
 }
 
 .metric-type {
-  background-color: #667eea;
-  color: white;
+  background: linear-gradient(135deg, #4a2c5a 0%, #6b3d7a 100%);
+  color: #d4af37;
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .metric-time {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: rgba(229, 231, 235, 0.6);
 }
 
 .metric-name {
   font-weight: 600;
-  color: #1f2937;
+  color: #e5e7eb;
   margin-bottom: 0.25rem;
 }
 
 .metric-value {
   font-size: 1.25rem;
-  color: #667eea;
+  color: #d4af37;
   font-weight: 600;
+  text-shadow: 0 0 8px rgba(212, 175, 55, 0.3);
 }
 
 .metric-payload {
@@ -76,10 +81,12 @@
     pre {
       margin-top: 0.5rem;
       padding: 0.5rem;
-      background-color: white;
+      background: rgba(10, 10, 10, 0.6);
+      border: 1px solid rgba(212, 175, 55, 0.2);
       border-radius: 0.25rem;
       overflow-x: auto;
       font-size: 0.8rem;
+      color: #e5e7eb;
     }
   }
 }

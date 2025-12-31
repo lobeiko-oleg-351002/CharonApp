@@ -5,7 +5,7 @@
 .loading, .empty-state {
   text-align: center;
   padding: 2rem;
-  color: #6b7280;
+  color: rgba(212, 175, 55, 0.7);
 }
 
 .aggregation-content {
@@ -19,9 +19,11 @@
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, #2d1b3d 0%, #1a1a2e 50%, #0f3460 100%);
+  color: #d4af37;
+  border: 1px solid rgba(212, 175, 55, 0.3);
   border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 20px rgba(212, 175, 55, 0.1);
 
   .label {
     font-size: 1rem;
@@ -31,14 +33,16 @@
   .value {
     font-size: 2rem;
     font-weight: 700;
+    text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
   }
 }
 
 .type-breakdown {
   h4 {
     margin: 0 0 1rem 0;
-    color: #374151;
+    color: #d4af37;
     font-size: 1.1rem;
+    text-shadow: 0 0 8px rgba(212, 175, 55, 0.3);
   }
 }
 
@@ -57,26 +61,29 @@
 
     .type-name {
       font-weight: 600;
-      color: #1f2937;
+      color: #e5e7eb;
       text-transform: capitalize;
     }
 
     .type-count {
       font-weight: 600;
-      color: #667eea;
+      color: #d4af37;
+      text-shadow: 0 0 8px rgba(212, 175, 55, 0.3);
     }
   }
 
   .type-bar {
     height: 8px;
-    background-color: #e5e7eb;
+    background-color: rgba(26, 26, 46, 0.6);
     border-radius: 4px;
     overflow: hidden;
+    border: 1px solid rgba(212, 175, 55, 0.2);
 
     .type-bar-fill {
       height: 100%;
-      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(90deg, #4a2c5a 0%, #6b3d7a 50%, #d4af37 100%);
       transition: width 0.3s ease;
+      box-shadow: 0 0 8px rgba(212, 175, 55, 0.4);
     }
   }
 }

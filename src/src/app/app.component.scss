@@ -5,18 +5,21 @@
 }
 
 .app-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, #2d1b3d 0%, #1a1a2e 50%, #0f3460 100%);
+  color: #d4af37;
   padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(212, 175, 55, 0.1);
+  border-bottom: 2px solid rgba(212, 175, 55, 0.3);
 
   h1 {
     margin: 0;
     font-size: 1.5rem;
     font-weight: 600;
+    text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+    letter-spacing: 1px;
   }
 
   .connection-status {
@@ -24,17 +27,20 @@
     align-items: center;
     gap: 0.5rem;
     font-size: 0.9rem;
+    color: #e5e7eb;
 
     .status-indicator {
       width: 10px;
       height: 10px;
       border-radius: 50%;
       background-color: #ef4444;
-      transition: background-color 0.3s;
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+      transition: background-color 0.3s, box-shadow 0.3s;
     }
 
     &.connected .status-indicator {
-      background-color: #10b981;
+      background-color: #d4af37;
+      box-shadow: 0 0 8px rgba(212, 175, 55, 0.8);
     }
   }
 }
@@ -42,7 +48,7 @@
 .app-main {
   flex: 1;
   padding: 2rem;
-  background-color: #f3f4f6;
+  background: transparent;
 }
 
 @media (max-width: 768px) {

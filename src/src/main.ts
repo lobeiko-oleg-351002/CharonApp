@@ -11,7 +11,7 @@ import { provideAnimations } from '@angular/platform-browser/animations';
 function createApollo(httpLink: HttpLink): ApolloClientOptions<any> {
   return {
     link: httpLink.create({
-      uri: 'http://localhost:5004/graphql',
+      uri: '/graphql',
     }),
     cache: new InMemoryCache(),
     defaultOptions: {

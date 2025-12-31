@@ -1,0 +1,14 @@
+{
+  "/graphql": {
+    "target": "http://localhost:5004",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/metricsHub": {
+    "target": "http://localhost:5006",
+    "ws": true,
+    "secure": false,
+    "changeOrigin": true
+  }
+}
+

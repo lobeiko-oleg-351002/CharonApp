@@ -59,12 +59,16 @@
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "browserTarget": "charon-app:build",
+            "proxyConfig": "proxy.conf.json"
+          },
           "configurations": {
             "production": {
-              "buildTarget": "charon-app:build:production"
+              "browserTarget": "charon-app:build:production"
             },
             "development": {
-              "buildTarget": "charon-app:build:development"
+              "browserTarget": "charon-app:build:development"
             }
           },
           "defaultConfiguration": "development"
