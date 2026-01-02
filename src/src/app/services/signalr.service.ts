@@ -9,9 +9,11 @@ import { Metric } from '../models/metric.model';
 export class SignalRService {
   private hubConnection?: HubConnection;
   private metricSubject = new BehaviorSubject<Metric | null>(null);
+  private dataUpdatedSubject = new BehaviorSubject<boolean>(false);
   private connectionStateSubject = new BehaviorSubject<boolean>(false);
 
   public metricReceived$: Observable<Metric | null> = this.metricSubject.asObservable();
+  public dataUpdated$: Observable<boolean> = this.dataUpdatedSubject.asObservable();
   public isConnected$: Observable<boolean> = this.connectionStateSubject.asObservable();
 
   constructor() {
@@ -33,28 +35,42 @@ export class SignalRService {
     });
 
     this.hubConnection.on('MetricReceived', (metric: Metric) => {
+      // Receive actual metric data for instant Latest Values update
       this.metricSubject.next(metric);
+    });
+
+    this.hubConnection.on('DataUpdated', () => {
+      // Notify that data has been updated - frontend will fetch chart/aggregations via GraphQL
+      this.dataUpdatedSubject.next(true);
     });
   }
 
   async startConnection(): Promise<void> {
-    if (this.hubConnection?.state === HubConnectionState.Disconnected) {
-      try {
-        await this.hubConnection.start();
-        this.connectionStateSubject.next(true);
-        console.log('SignalR connection started');
-      } catch (error) {
-        console.error('Error starting SignalR connection:', error);
-        this.connectionStateSubject.next(false);
-      }
+    if (!this.hubConnection || this.hubConnection.state !== HubConnectionState.Disconnected) {
+      return;
+    }
+
+    try {
+      await this.hubConnection.start();
+      this.connectionStateSubject.next(true);
+    } catch (error) {
+      console.error('Error starting SignalR connection:', error);
+      this.connectionStateSubject.next(false);
+      throw error;
     }
   }
 
   async stopConnection(): Promise<void> {
-    if (this.hubConnection?.state !== HubConnectionState.Disconnected) {
-      await this.hubConnection?.stop();
+    if (!this.hubConnection || this.hubConnection.state === HubConnectionState.Disconnected) {
+      return;
+    }
+
+    try {
+      await this.hubConnection.stop();
       this.connectionStateSubject.next(false);
-      console.log('SignalR connection stopped');
+    } catch (error) {
+      console.error('Error stopping SignalR connection:', error);
+      throw error;
     }
   }
 }

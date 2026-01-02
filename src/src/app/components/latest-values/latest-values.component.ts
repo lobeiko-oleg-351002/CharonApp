@@ -21,8 +21,8 @@ export class LatestValuesComponent {
     return String(metric.payload[firstKey]);
   }
 
-  hasMultiplePayloadKeys(payload: any): boolean {
-    return payload && Object.keys(payload).length > 1;
+  hasMultiplePayloadKeys(payload: Record<string, unknown>): boolean {
+    return payload !== null && payload !== undefined && Object.keys(payload).length > 1;
   }
 }
 

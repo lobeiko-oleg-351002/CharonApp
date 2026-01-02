@@ -1,45 +1,14 @@
 import { Injectable } from '@angular/core';
 import { Apollo, gql } from 'apollo-angular';
 import { Observable, map } from 'rxjs';
-import { Metric, MetricsAggregation, MetricFilter } from '../models/metric.model';
-
-const GET_METRICS = gql`
-  query GetMetrics($first: Int, $after: String, $where: MetricFilterInput, $order: [MetricSortInput!]) {
-    metrics(first: $first, after: $after, where: $where, order: $order) {
-      edges {
-        node {
-          id
-          type
-          name
-          payload
-          createdAt
-        }
-      }
-      pageInfo {
-        hasNextPage
-        hasPreviousPage
-        startCursor
-        endCursor
-      }
-    }
-  }
-`;
-
-const GET_LATEST_METRICS = gql`
-  query GetLatestMetrics($first: Int, $order: [MetricSortInput!]) {
-    metrics(first: $first, order: $order) {
-      edges {
-        node {
-          id
-          type
-          name
-          payload
-          createdAt
-        }
-      }
-    }
-  }
-`;
+import { Metric, MetricsAggregation, MetricFilter, DailyAverageMetric } from '../models/metric.model';
+import { 
+  GraphQLMetricResponse, 
+  GraphQLMetricsByTypeResponse, 
+  GraphQLMetricsAggregationResponse,
+  GraphQLDailyAverageMetricsResponse,
+  GraphQLLatestMetricsResponse
+} from '../models/api-response.model';
 
 const GET_METRIC_BY_ID = gql`
   query GetMetricById($id: Int!) {
@@ -66,12 +35,43 @@ const GET_METRICS_BY_TYPE = gql`
 `;
 
 const GET_METRICS_AGGREGATION = gql`
-  query GetMetricsAggregation($fromDate: DateTime, $toDate: DateTime, $type: String) {
-    metricsAggregation(fromDate: $fromDate, toDate: $toDate, type: $type) {
+  query GetMetricsAggregation($fromDate: DateTime, $toDate: DateTime, $type: String, $name: String) {
+    metricsAggregation(fromDate: $fromDate, toDate: $toDate, type: $type, name: $name) {
       totalCount
       typeAggregations {
         type
         count
+      }
+    }
+  }
+`;
+
+const GET_DAILY_AVERAGE_METRICS = gql`
+  query GetDailyAverageMetrics($fromDate: DateTime!, $toDate: DateTime!, $type: String, $name: String) {
+    dailyAverageMetrics(fromDate: $fromDate, toDate: $toDate, type: $type, name: $name) {
+      date
+      type
+      name
+      count
+    }
+  }
+`;
+
+const GET_LATEST_METRICS = gql`
+  query GetLatestMetrics($first: Int, $order: [MetricSortInput!]) {
+    metrics(first: $first, order: $order) {
+      edges {
+        node {
+          id
+          type
+          name
+          payload
+          createdAt
+        }
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
       }
     }
   }
@@ -83,45 +83,8 @@ const GET_METRICS_AGGREGATION = gql`
 export class GraphQLService {
   constructor(private apollo: Apollo) {}
 
-  getMetrics(first: number = 10, after?: string, filter?: MetricFilter): Observable<{ metrics: Metric[]; totalCount: number }> {
-    const where: any = {};
-    if (filter?.type) {
-      where.type = { eq: filter.type };
-    }
-    if (filter?.fromDate) {
-      where.createdAt = { ...where.createdAt, gte: filter.fromDate.toISOString() };
-    }
-    if (filter?.toDate) {
-      where.createdAt = { ...where.createdAt, lte: filter.toDate.toISOString() };
-    }
-
-    return this.apollo.query<{ metrics: { edges: Array<{ node: Metric }> } }>({
-      query: GET_METRICS,
-      variables: { first, after: after || null, where: Object.keys(where).length > 0 ? where : undefined },
-      fetchPolicy: 'network-only'
-    }).pipe(
-      map(result => ({
-        metrics: result.data.metrics.edges.map(edge => edge.node),
-        totalCount: result.data.metrics.edges.length // Use edges length as approximation
-      }))
-    );
-  }
-
-  getLatestMetrics(limit: number = 5): Observable<Metric[]> {
-    return this.apollo.query<{ metrics: { edges: Array<{ node: Metric }> } }>({
-      query: GET_LATEST_METRICS,
-      variables: {
-        first: limit,
-        order: [{ createdAt: 'DESC' }]
-      },
-      fetchPolicy: 'network-only'
-    }).pipe(
-      map(result => result.data.metrics.edges.map(edge => edge.node))
-    );
-  }
-
   getMetricById(id: number): Observable<Metric | null> {
-    return this.apollo.query<{ metricById: Metric | null }>({
+    return this.apollo.query<GraphQLMetricResponse>({
       query: GET_METRIC_BY_ID,
       variables: { id },
       fetchPolicy: 'network-only'
@@ -131,7 +94,7 @@ export class GraphQLService {
   }
 
   getMetricsByType(type: string): Observable<Metric[]> {
-    return this.apollo.query<{ metricsByType: Metric[] }>({
+    return this.apollo.query<GraphQLMetricsByTypeResponse>({
       query: GET_METRICS_BY_TYPE,
       variables: { type },
       fetchPolicy: 'network-only'
@@ -141,16 +104,64 @@ export class GraphQLService {
   }
 
   getMetricsAggregation(filter?: MetricFilter): Observable<MetricsAggregation> {
-    return this.apollo.query<{ metricsAggregation: MetricsAggregation }>({
+    return this.apollo.query<GraphQLMetricsAggregationResponse>({
       query: GET_METRICS_AGGREGATION,
       variables: {
         fromDate: filter?.fromDate?.toISOString(),
         toDate: filter?.toDate?.toISOString(),
-        type: filter?.type
+        type: filter?.type,
+        name: filter?.name
       },
       fetchPolicy: 'network-only'
     }).pipe(
       map(result => result.data.metricsAggregation)
+    );
+  }
+
+  getDailyAverageMetrics(fromDate: Date, toDate: Date, filter?: MetricFilter): Observable<DailyAverageMetric[]> {
+    return this.apollo.query<GraphQLDailyAverageMetricsResponse>({
+      query: GET_DAILY_AVERAGE_METRICS,
+      variables: {
+        fromDate: fromDate.toISOString(),
+        toDate: toDate.toISOString(),
+        type: filter?.type,
+        name: filter?.name
+      },
+      fetchPolicy: 'network-only'
+    }).pipe(
+      map(result => result.data.dailyAverageMetrics)
+    );
+  }
+
+  getLatestMetrics(count: number = 100, filter?: MetricFilter): Observable<Metric[]> {
+    const order = [{ createdAt: 'DESC' }];
+    const variables: any = {
+      first: count,
+      order: order
+    };
+
+    // Note: GraphQL GetMetrics supports filtering, but we'll apply filters in the query if needed
+    // For now, we'll get latest metrics and filter client-side if needed
+    
+    return this.apollo.query<GraphQLLatestMetricsResponse>({
+      query: GET_LATEST_METRICS,
+      variables: variables,
+      fetchPolicy: 'network-only'
+    }).pipe(
+      map(result => {
+        // Extract nodes from edges
+        let metrics = result.data.metrics.edges.map(edge => edge.node);
+        
+        // Apply client-side filtering if needed
+        if (filter?.type) {
+          metrics = metrics.filter(m => m.type === filter.type);
+        }
+        if (filter?.name) {
+          metrics = metrics.filter(m => m.name.includes(filter.name!));
+        }
+        
+        return metrics;
+      })
     );
   }
 }

@@ -28,8 +28,9 @@
     <div class="dashboard-card chart-card">
       <h3>Metrics Chart</h3>
       <app-metrics-chart
-        [metrics]="latestMetrics"
-        [loading]="loading">
+        [metrics]="chartMetrics"
+        [loading]="loading"
+        [dateRange]="chartDateRange">
       </app-metrics-chart>
     </div>
 
@@ -41,5 +42,11 @@
       </app-aggregations>
     </div>
   </div>
+
+  <app-daily-averages-table
+    *ngIf="chartDateRange.fromDate && chartDateRange.toDate"
+    [dailyAverages]="dailyAverages"
+    [loading]="loading">
+  </app-daily-averages-table>
 </div>
 

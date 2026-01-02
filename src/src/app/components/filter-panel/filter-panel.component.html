@@ -14,30 +14,38 @@
       </label>
 
       <label>
-        Search:
+        Location (Name):
         <input
           type="text"
-          [(ngModel)]="localFilter.search"
-          placeholder="Search metrics">
+          [(ngModel)]="localFilter.name"
+          placeholder="Filter by location">
       </label>
     </div>
 
     <div class="filter-row">
-      <label>
-        From Date:
+      <mat-form-field appearance="outline" class="date-picker-field">
+        <mat-label>From Date</mat-label>
         <input
-          type="datetime-local"
-          [value]="localFilter.fromDate ? (localFilter.fromDate | date:'yyyy-MM-ddTHH:mm') : ''"
-          (change)="onDateChange()">
-      </label>
+          matInput
+          [matDatepicker]="fromDatePicker"
+          [value]="fromDateValue"
+          (dateInput)="onFromDateChange($event.value)"
+          (dateChange)="onFromDateChange($event.value)">
+        <mat-datepicker-toggle matIconSuffix [for]="fromDatePicker"></mat-datepicker-toggle>
+        <mat-datepicker #fromDatePicker></mat-datepicker>
+      </mat-form-field>
 
-      <label>
-        To Date:
+      <mat-form-field appearance="outline" class="date-picker-field">
+        <mat-label>To Date</mat-label>
         <input
-          type="datetime-local"
-          [value]="localFilter.toDate ? (localFilter.toDate | date:'yyyy-MM-ddTHH:mm') : ''"
-          (change)="onDateChange()">
-      </label>
+          matInput
+          [matDatepicker]="toDatePicker"
+          [value]="toDateValue"
+          (dateInput)="onToDateChange($event.value)"
+          (dateChange)="onToDateChange($event.value)">
+        <mat-datepicker-toggle matIconSuffix [for]="toDatePicker"></mat-datepicker-toggle>
+        <mat-datepicker #toDatePicker></mat-datepicker>
+      </mat-form-field>
     </div>
 
     <div class="filter-actions">
