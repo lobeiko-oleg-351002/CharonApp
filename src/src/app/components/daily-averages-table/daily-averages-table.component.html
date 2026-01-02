@@ -1,0 +1,31 @@
+<div class="daily-averages-table-container">
+  <h3>Daily Averages (Dev Table)</h3>
+  
+  <div *ngIf="loading" class="loading">Loading...</div>
+  
+  <div *ngIf="!loading && dailyAverages.length === 0" class="no-data">
+    No daily averages data available
+  </div>
+  
+  <table *ngIf="!loading && dailyAverages.length > 0" class="daily-averages-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Type</th>
+        <th>Location</th>
+        <th>Average Values</th>
+        <th>Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let avg of dailyAverages">
+        <td>{{ formatDate(avg.date) }}</td>
+        <td><span class="type-tag">{{ avg.type }}</span></td>
+        <td>{{ avg.name }}</td>
+        <td>{{ getAverageValuesString(avg) }}</td>
+        <td>{{ avg.count }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+

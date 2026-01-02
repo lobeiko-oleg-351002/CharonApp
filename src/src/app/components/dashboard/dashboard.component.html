@@ -42,5 +42,11 @@
       </app-aggregations>
     </div>
   </div>
+
+  <app-daily-averages-table
+    *ngIf="chartDateRange.fromDate && chartDateRange.toDate"
+    [dailyAverages]="dailyAverages"
+    [loading]="loading">
+  </app-daily-averages-table>
 </div>
 

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ChartConfiguration, ChartData, ChartType } from 'chart.js';
 import { NgChartsModule } from 'ng2-charts';
 import { Metric } from '../../models/metric.model';
+import { APP_CONSTANTS } from '../../constants/app.constants';
 
 @Component({
   selector: 'app-metrics-chart',
@@ -83,20 +84,7 @@ export class MetricsChartComponent implements OnInit, OnChanges {
       return;
     }
 
-    // Filter metrics by date range if provided
-    let filteredMetrics = this.metrics;
-    if (this.dateRange) {
-      filteredMetrics = this.metrics.filter(m => {
-        const metricDate = new Date(m.createdAt);
-        if (this.dateRange!.fromDate && metricDate < this.dateRange!.fromDate) {
-          return false;
-        }
-        if (this.dateRange!.toDate && metricDate > this.dateRange!.toDate) {
-          return false;
-        }
-        return true;
-      });
-    }
+    const filteredMetrics = this.filterMetricsByDateRange(this.metrics);
 
     if (filteredMetrics.length === 0) {
       this.chartData = {
@@ -113,36 +101,7 @@ export class MetricsChartComponent implements OnInit, OnChanges {
       .slice()
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     
-    // Format labels based on date range span
-    const labels = sortedMetrics.map(m => {
-      const date = new Date(m.createdAt);
-      if (this.dateRange?.fromDate && this.dateRange?.toDate) {
-        const span = this.dateRange.toDate.getTime() - this.dateRange.fromDate.getTime();
-        const days = span / (1000 * 60 * 60 * 24);
-        
-        if (days > 1) {
-          // Show date and time for multi-day ranges
-          return date.toLocaleString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          });
-        } else {
-          // Show time only for same-day ranges
-          return date.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            second: '2-digit'
-          });
-        }
-      }
-      return date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        second: '2-digit'
-      });
-    });
+    const labels = this.formatChartLabels(sortedMetrics);
 
     const datasets = Object.entries(typeGroups).map(([type, metrics], index) => {
       const colors = [
@@ -160,7 +119,18 @@ export class MetricsChartComponent implements OnInit, OnChanges {
           if (m.type === type && m.payload) {
             const firstKey = Object.keys(m.payload)[0];
             const value = m.payload[firstKey];
-            return typeof value === 'number' ? value : 0;
+            // Parse value - handle both numbers and string numbers
+            if (typeof value === 'number') {
+              return value;
+            }
+            if (typeof value === 'string') {
+              // Handle boolean strings and numeric strings
+              if (value.toLowerCase() === 'true') return 1;
+              if (value.toLowerCase() === 'false') return 0;
+              const parsed = parseFloat(value);
+              return isNaN(parsed) ? 0 : parsed;
+            }
+            return 0;
           }
           return null;
         }),
@@ -175,6 +145,58 @@ export class MetricsChartComponent implements OnInit, OnChanges {
       labels,
       datasets
     };
+  }
+
+  private filterMetricsByDateRange(metrics: Metric[]): Metric[] {
+    if (!this.dateRange?.fromDate || !this.dateRange?.toDate) {
+      return metrics;
+    }
+
+    const fromTime = this.dateRange.fromDate.getTime();
+    const toTime = this.dateRange.toDate.getTime();
+
+    return metrics.filter(m => {
+      const metricTime = new Date(m.createdAt).getTime();
+      return metricTime >= fromTime && metricTime <= toTime;
+    });
+  }
+
+  private formatChartLabels(metrics: Metric[]): string[] {
+    return metrics.map(m => {
+      const date = new Date(m.createdAt);
+      
+      if (this.dateRange?.fromDate && this.dateRange?.toDate) {
+        // For date-filtered queries (daily averages), always show date format
+        const span = this.dateRange.toDate.getTime() - this.dateRange.fromDate.getTime();
+        const days = span / (1000 * 60 * 60 * 24);
+        
+        // For daily averages, show date (not time) since data is aggregated by day
+        if (days > 7) {
+          // Long range: show month and day
+          return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+          });
+        } else if (days > 1) {
+          // Medium range: show month, day, and year if different
+          return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+          });
+        } else {
+          // Single day: show date
+          return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric'
+          });
+        }
+      }
+      
+      // No date range: show time only for real-time metrics
+      return date.toLocaleTimeString('en-US', APP_CONSTANTS.DATE_FORMAT.SINGLE_DAY);
+    });
   }
 
   private groupByType(metrics: Metric[]): Record<string, Metric[]> {

@@ -4,12 +4,15 @@ import { FormsModule } from '@angular/forms';
 import { GraphQLService } from '../../services/graphql.service';
 import { RestService } from '../../services/rest.service';
 import { SignalRService } from '../../services/signalr.service';
+import { ErrorHandlerService } from '../../services/error-handler.service';
 import { Metric, MetricsAggregation, MetricFilter, DailyAverageMetric } from '../../models/metric.model';
 import { Subject, takeUntil, debounceTime } from 'rxjs';
 import { LatestValuesComponent } from '../latest-values/latest-values.component';
 import { MetricsChartComponent } from '../metrics-chart/metrics-chart.component';
 import { AggregationsComponent } from '../aggregations/aggregations.component';
 import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
+import { DailyAveragesTableComponent } from '../daily-averages-table/daily-averages-table.component';
+import { APP_CONSTANTS } from '../../constants/app.constants';
 
 @Component({
   selector: 'app-dashboard',
@@ -20,16 +23,17 @@ import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
     LatestValuesComponent,
     MetricsChartComponent,
     AggregationsComponent,
-    FilterPanelComponent
+    FilterPanelComponent,
+    DailyAveragesTableComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
 export class DashboardComponent implements OnInit, OnDestroy {
   latestMetrics: Metric[] = [];
-  chartMetrics: Metric[] = []; // Metrics for chart (converted from daily averages)
-  dailyAverages: DailyAverageMetric[] = []; // Daily average metrics for chart
-  realTimeMetrics: Metric[] = []; // Real-time metrics received via SignalR (separate from daily averages)
+  chartMetrics: Metric[] = []; // Metrics for chart (from GraphQL at startup + SignalR updates, or daily averages when date filtered)
+  dailyAverages: DailyAverageMetric[] = []; // Daily average metrics for chart (when date filtered)
+  realTimeMetrics: Metric[] = []; // Real-time metrics received via SignalR (added to chartMetrics in real-time mode)
   aggregation: MetricsAggregation | null = null;
   loading = false;
   error: string | null = null;
@@ -41,53 +45,61 @@ export class DashboardComponent implements OnInit, OnDestroy {
   constructor(
     private graphQLService: GraphQLService,
     private restService: RestService,
-    private signalRService: SignalRService
+    private signalRService: SignalRService,
+    private errorHandler: ErrorHandlerService
   ) {}
 
   ngOnInit(): void {
     this.loadData();
     this.loadChartData();
     this.setupSignalRUpdates();
-    this.signalRService.startConnection();
+    this.signalRService.startConnection().catch(err => {
+      const appError = this.errorHandler.handleError(err);
+      console.error('Failed to start SignalR connection:', appError);
+    });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    this.signalRService.stopConnection();
+    this.signalRService.stopConnection().catch(err => {
+      console.error('Error stopping SignalR connection:', err);
+    });
   }
 
   private loadData(): void {
     this.loading = true;
     this.error = null;
 
-    // Apply filters for latest metrics (type and name, but not date range)
-    // IMPORTANT: Explicitly exclude dates to prevent GraphQL calls with date filters
-    // Only include filter if there are actual values (type or name)
-    const latestFilter: MetricFilter = {};
-    if (this.filter.type) {
-      latestFilter.type = this.filter.type;
-    }
-    if (this.filter.name) {
-      latestFilter.name = this.filter.name;
-    }
-    // Explicitly NO fromDate/toDate - use REST API for date-filtered queries
-
-    const filterToUse = Object.keys(latestFilter).length > 0 ? latestFilter : undefined;
-    console.log('loadData: Using REST API (GraphQL disabled):', filterToUse || 'no filters');
-    // Use REST API instead of GraphQL to avoid complexity issues
-    // Even without dates, GraphQL can exceed complexity limits
-    this.restService.getMetrics(filterToUse, 1, 5)
+    // Use GraphQL to get latest 50 metrics at startup (max allowed by server)
+    // These metrics are used for both Latest Values section and Chart (when no date filter)
+    const filterToUse = this.buildFilter(this.filter.type, this.filter.name);
+    this.graphQLService.getLatestMetrics(50, filterToUse)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (result) => {
-          this.latestMetrics = result.items;
+        next: (metrics) => {
+          // Take only the latest 5 for display in Latest Values section
+          this.latestMetrics = metrics.slice(0, APP_CONSTANTS.PAGINATION.LATEST_METRICS_LIMIT);
+          
+          // If no date filter, use these metrics for chart (real-time mode)
+          if (!this.chartDateRange.fromDate || !this.chartDateRange.toDate) {
+            // Normalize dates to ISO string format for consistent sorting
+            this.chartMetrics = metrics
+              .map(m => ({
+                ...m,
+                createdAt: new Date(m.createdAt).toISOString()
+              }))
+              .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+            // Merge with any existing real-time metrics from SignalR
+            this.updateChartFromRealTimeMetrics();
+          }
+          
           this.loading = false;
         },
         error: (err) => {
-          this.error = 'Failed to load metrics. Please try again.';
+          const appError = this.errorHandler.handleError(err);
+          this.error = this.errorHandler.getUserFriendlyMessage(appError);
           this.loading = false;
-          console.error('Error loading metrics:', err);
         }
       });
 
@@ -95,239 +107,243 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   private loadChartData(): void {
-    // Load metrics for chart when date range is selected
-    // Use REST API for date-filtered queries to avoid GraphQL complexity errors
     if (this.chartDateRange.fromDate && this.chartDateRange.toDate) {
+      // Use REST API for daily average metrics for date-filtered queries
       const chartFilter: MetricFilter = {
         type: this.filter.type,
-        name: this.filter.name,
-        fromDate: this.chartDateRange.fromDate,
-        toDate: this.chartDateRange.toDate
+        name: this.filter.name
       };
 
-      // Use REST API for date-filtered queries (no complexity issues)
-      this.restService.getAllMetrics(chartFilter, 100) // Max 100 metrics for chart
+      // Ensure dates are at start/end of day for proper filtering
+      const fromDate = new Date(this.chartDateRange.fromDate);
+      fromDate.setHours(0, 0, 0, 0);
+      const toDate = new Date(this.chartDateRange.toDate);
+      toDate.setHours(23, 59, 59, 999);
+
+      this.restService.getDailyAverages(
+        fromDate,
+        toDate,
+        chartFilter
+      )
         .pipe(takeUntil(this.destroy$))
         .subscribe({
-          next: (metrics) => {
-            // Store loaded metrics as base data
-            // Real-time metrics will be added on top via addMetricToChart()
-            this.chartMetrics = metrics
-              .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-            this.dailyAverages = [];
-            
-            // Now add any existing real-time metrics that match the date range
-            this.updateChartFromRealTimeMetrics();
+          next: (dailyAverages) => {
+            this.dailyAverages = dailyAverages;
+            // Convert daily averages to metrics format for chart display
+            // For date-filtered queries, show ONLY daily averages, no real-time metrics
+            this.chartMetrics = this.convertDailyAveragesToMetrics(dailyAverages);
           },
           error: (err) => {
-            console.error('Error loading chart data via REST:', err);
-            // Show real-time metrics even if initial load fails
-            this.updateChartFromRealTimeMetrics();
+            const appError = this.errorHandler.handleError(err);
+            console.error('Error loading daily average metrics:', appError);
+            this.dailyAverages = [];
+            this.chartMetrics = [];
           }
         });
     } else {
-      // If no date range, use GraphQL for simple queries (type/name filters only)
-      // Only include filter if there are actual values (type or name)
-      const latestFilter: MetricFilter = {};
-      if (this.filter.type) {
-        latestFilter.type = this.filter.type;
-      }
-      if (this.filter.name) {
-        latestFilter.name = this.filter.name;
-      }
-      // Explicitly NO fromDate/toDate - use REST API for date-filtered queries
-      
-      const filterToUse = Object.keys(latestFilter).length > 0 ? latestFilter : undefined;
-      console.log('loadChartData (no date range): Using REST API instead of GraphQL');
-      // Use REST API instead of GraphQL to avoid complexity issues
-      this.restService.getAllMetrics(filterToUse, 20)
-        .pipe(takeUntil(this.destroy$))
-        .subscribe({
-          next: (metrics) => {
-            // Store loaded metrics as base data
-            // Real-time metrics will be added on top via addMetricToChart()
-            this.chartMetrics = metrics
-              .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-            this.dailyAverages = [];
-            
-            // Now add any existing real-time metrics
-            this.updateChartFromRealTimeMetrics();
-          },
-          error: (err) => {
-            console.error('Error loading latest metrics for chart:', err);
-            // Show real-time metrics even if initial load fails
-            this.updateChartFromRealTimeMetrics();
-          }
-        });
-    }
-  }
-
-  // Removed loadChartDataPaginated - now using REST API for date-filtered queries
-
-  private updateChartFromRealTimeMetrics(): void {
-    // Update chart by combining existing chartMetrics with real-time metrics
-    if (this.chartDateRange.fromDate && this.chartDateRange.toDate) {
-      // Filter real-time metrics by date range
-      const validRealTimeMetrics = this.realTimeMetrics.filter(m => {
-        const metricDate = new Date(m.createdAt);
-        return metricDate >= this.chartDateRange.fromDate! && 
-               metricDate <= this.chartDateRange.toDate!;
-      });
-      
-      console.log(`Updating chart: ${this.chartMetrics.length} existing metrics, ${validRealTimeMetrics.length} valid real-time metrics`);
-      
-      // Combine existing chartMetrics (from REST/GraphQL) with real-time metrics
-      // Remove duplicates by ID, keeping the most recent version (real-time metrics take priority)
-      const allMetrics = [...this.chartMetrics, ...validRealTimeMetrics];
-      const uniqueMetrics = Array.from(
-        new Map(allMetrics.map(m => [m.id, m])).values()
-      );
-      
-      this.chartMetrics = uniqueMetrics
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      
-      console.log(`Chart updated with ${this.chartMetrics.length} total metrics`);
-    } else {
-      // No date range - combine existing chartMetrics with all real-time metrics
-      console.log(`Updating chart (no date range): ${this.chartMetrics.length} existing metrics, ${this.realTimeMetrics.length} real-time metrics`);
-      
-      const allMetrics = [...this.chartMetrics, ...this.realTimeMetrics];
-      const uniqueMetrics = Array.from(
-        new Map(allMetrics.map(m => [m.id, m])).values()
-      );
-      
-      this.chartMetrics = uniqueMetrics
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      
-      console.log(`Chart updated with ${this.chartMetrics.length} total metrics`);
+      // No date filter - chart data comes from GraphQL (loadData) + SignalR updates
+      // No need for separate REST call - we already have data from GraphQL
+      this.dailyAverages = [];
+      // Chart metrics are already set in loadData() from GraphQL
+      // SignalR will add new metrics via updateChartFromRealTimeMetrics()
     }
   }
 
   private convertDailyAveragesToMetrics(dailyAverages: DailyAverageMetric[]): Metric[] {
-    // Convert daily averages to Metric format for chart display
-    // Since averageValues is not included in GraphQL query to reduce complexity,
-    // we use an empty payload or reconstruct from available data
-    return dailyAverages.map(avg => ({
-      id: 0, // Daily averages don't have individual IDs
-      type: avg.type,
-      name: avg.name,
-      payload: avg.averageValues || {}, // Will be empty if not included in query
-      createdAt: avg.date
-    }));
+    // Group by date and type to create one metric per day per type
+    const groupedByDateAndType = dailyAverages.reduce((acc, avg) => {
+      const key = `${avg.date}_${avg.type}_${avg.name}`;
+      if (!acc[key]) {
+        acc[key] = {
+          date: avg.date,
+          type: avg.type,
+          name: avg.name,
+          averageValues: { ...avg.averageValues }
+        };
+      } else {
+        // Merge average values if same date/type/name
+        Object.assign(acc[key].averageValues, avg.averageValues);
+      }
+      return acc;
+    }, {} as Record<string, { date: string; type: string; name: string; averageValues: Record<string, number> }>);
+
+    // Convert to metrics, creating one metric per day with all average values
+    return Object.values(groupedByDateAndType)
+      .map(item => ({
+        id: 0, // Daily averages don't have individual IDs
+        type: item.type,
+        name: item.name,
+        payload: item.averageValues,
+        createdAt: item.date
+      }))
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }
 
-  private addMetricToChart(metric: Metric): void {
-    // Only add real metrics (with ID), not daily averages
-    if (metric.id === 0) {
-      console.log('Skipping metric with ID 0 (daily average)');
+  private updateChartFromRealTimeMetrics(): void {
+    // Only merge real-time metrics if date filter is NOT active
+    if (this.chartDateRange.fromDate && this.chartDateRange.toDate) {
+      // Date filter is active - don't merge real-time metrics, only show daily averages
       return;
     }
 
-    // Add/update in realTimeMetrics array
+    // For non-date-filtered queries, merge real-time metrics with chart metrics
+    // Ensure all metrics have consistent date format for proper sorting
+    const normalizedChartMetrics = this.chartMetrics.map(m => ({
+      ...m,
+      createdAt: new Date(m.createdAt).toISOString()
+    }));
+    const normalizedRealTimeMetrics = this.realTimeMetrics.map(m => ({
+      ...m,
+      createdAt: new Date(m.createdAt).toISOString()
+    }));
+    
+    const allMetrics = [...normalizedChartMetrics, ...normalizedRealTimeMetrics];
+    const uniqueMetrics = this.deduplicateMetrics(allMetrics);
+    
+    this.chartMetrics = this.sortMetricsByDate(uniqueMetrics);
+  }
+
+  private deduplicateMetrics(metrics: Metric[]): Metric[] {
+    return Array.from(
+      new Map(metrics.map(m => [m.id, m])).values()
+    );
+  }
+
+  private sortMetricsByDate(metrics: Metric[]): Metric[] {
+    return metrics.sort((a, b) => {
+      // Parse dates consistently to avoid timezone issues
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
+      
+      // Handle invalid dates
+      if (isNaN(dateA.getTime())) return 1;
+      if (isNaN(dateB.getTime())) return -1;
+      
+      return dateA.getTime() - dateB.getTime();
+    });
+  }
+
+  private addMetricToChart(metric: Metric): void {
+    if (metric.id === 0) {
+      return;
+    }
+
+    // Only add real-time metrics if date filter is NOT active
+    if (this.chartDateRange.fromDate && this.chartDateRange.toDate) {
+      // Date filter is active - don't add real-time metrics, only show daily averages
+      return;
+    }
+
     const existingIndex = this.realTimeMetrics.findIndex(m => m.id === metric.id);
     if (existingIndex >= 0) {
       this.realTimeMetrics[existingIndex] = metric;
-      console.log(`Updated real-time metric ${metric.id} in chart`);
     } else {
       this.realTimeMetrics.push(metric);
-      console.log(`Added new real-time metric ${metric.id} to chart. Total real-time: ${this.realTimeMetrics.length}`);
-      // Limit to reasonable number of real-time metrics
-      if (this.realTimeMetrics.length > 100) {
-        this.realTimeMetrics = this.realTimeMetrics.slice(-100);
+      if (this.realTimeMetrics.length > APP_CONSTANTS.PAGINATION.REAL_TIME_METRICS_LIMIT) {
+        this.realTimeMetrics = this.realTimeMetrics.slice(-APP_CONSTANTS.PAGINATION.REAL_TIME_METRICS_LIMIT);
       }
     }
 
-    // Update chartMetrics by combining existing chartMetrics with real-time metrics
     this.updateChartFromRealTimeMetrics();
   }
 
   private setupSignalRUpdates(): void {
-    // Handle real-time metric updates for Latest Values (instant update)
     this.signalRService.metricReceived$
       .pipe(takeUntil(this.destroy$))
       .subscribe(metric => {
         if (metric) {
-          // Apply filters to SignalR updates
           const matchesFilter = (!this.filter.type || metric.type === this.filter.type) &&
                                (!this.filter.name || metric.name.includes(this.filter.name));
 
           if (matchesFilter) {
-            // Update Latest Values instantly with received metric
-            this.latestMetrics = [metric, ...this.latestMetrics].slice(0, 20);
+            this.latestMetrics = [metric, ...this.latestMetrics]
+              .slice(0, APP_CONSTANTS.PAGINATION.LATEST_METRICS_LIMIT * 4);
             
-            // Add metric to chart if it matches the date range or if no date range is set
-            const metricDate = new Date(metric.createdAt);
-            const hasDateRange = this.chartDateRange.fromDate && this.chartDateRange.toDate;
-            const isInDateRange = !hasDateRange || 
-                                 (metricDate >= this.chartDateRange.fromDate! && metricDate <= this.chartDateRange.toDate!);
-            
-            if (isInDateRange) {
-              console.log(`Adding metric ${metric.id} to chart. Date range: ${hasDateRange ? 'set' : 'not set'}, Metric date: ${metric.createdAt}`);
-              // If date range is set, add individual metric to chart for real-time updates
-              // If no date range, show live metrics
+            // Only add to chart if date filter is NOT active (real-time mode)
+            // If date filter is active, chart shows daily averages only
+            if (!this.chartDateRange.fromDate || !this.chartDateRange.toDate) {
               this.addMetricToChart(metric);
-            } else {
-              console.log(`Skipping metric ${metric.id} - outside date range. Metric: ${metric.createdAt}, Range: ${this.chartDateRange.fromDate} to ${this.chartDateRange.toDate}`);
             }
           }
         }
       });
 
-    // Handle data update notifications for aggregations
-    // Note: We don't reload chart data here to avoid overwriting real-time metrics
-    // Real-time metrics are handled by metricReceived$ subscription above
     this.signalRService.dataUpdated$
       .pipe(
-        debounceTime(200), // Debounce to avoid too many requests if multiple notifications arrive quickly
+        debounceTime(APP_CONSTANTS.DEBOUNCE.DATA_UPDATE),
         takeUntil(this.destroy$)
       )
       .subscribe(() => {
-        // Refresh aggregations (requires server-side filtering)
         this.loadAggregation();
-        
-        // Don't reload chart data here - it would overwrite real-time metrics
-        // Real-time metrics are already being added via metricReceived$ subscription
-        // If you need to refresh historical data, use the refresh button
       });
   }
 
   onFilterChange(filter: MetricFilter): void {
-    // Separate filters: type/name for latest values, dates for chart
     this.filter = {
       type: filter.type,
       name: filter.name
     };
     
-    // Update chart date range
     const previousDateRange = { ...this.chartDateRange };
+    const hadDateRange = previousDateRange.fromDate && previousDateRange.toDate;
+    const hasDateRange = filter.fromDate && filter.toDate;
+    
     this.chartDateRange = {
       fromDate: filter.fromDate,
       toDate: filter.toDate
     };
     
-    // Clear real-time metrics if date range changed significantly
-    if (previousDateRange.fromDate !== filter.fromDate || previousDateRange.toDate !== filter.toDate) {
-      // Filter real-time metrics to keep only those in new range
-      if (filter.fromDate && filter.toDate) {
-        this.realTimeMetrics = this.realTimeMetrics.filter(m => {
-          const metricDate = new Date(m.createdAt);
-          return metricDate >= filter.fromDate! && metricDate <= filter.toDate!;
-        });
+    // Clear real-time metrics if switching to date filter mode
+    if (hasDateRange && !hadDateRange) {
+      this.realTimeMetrics = [];
+    }
+    
+    if (this.hasDateRangeChanged(previousDateRange, filter)) {
+      if (hasDateRange) {
+        // Date filter is active - clear real-time metrics
+        this.realTimeMetrics = [];
       }
     }
     
-    // Clear chart data when filters change
     this.chartMetrics = [];
-    
+    this.dailyAverages = [];
     this.loadData();
     this.loadChartData();
   }
 
+  private hasDateRangeChanged(previous: { fromDate?: Date; toDate?: Date }, current: MetricFilter): boolean {
+    return previous.fromDate !== current.fromDate || previous.toDate !== current.toDate;
+  }
+
+  private filterRealTimeMetricsByDateRange(fromDate?: Date, toDate?: Date): void {
+    if (!fromDate || !toDate) {
+      return;
+    }
+
+    const fromTime = fromDate.getTime();
+    const toTime = toDate.getTime();
+
+    this.realTimeMetrics = this.realTimeMetrics.filter(m => {
+      const metricTime = new Date(m.createdAt).getTime();
+      return metricTime >= fromTime && metricTime <= toTime;
+    });
+  }
+
+  private buildFilter(type?: string, name?: string): MetricFilter | undefined {
+    const filter: MetricFilter = {};
+    
+    if (type) {
+      filter.type = type;
+    }
+    if (name) {
+      filter.name = name;
+    }
+
+    return Object.keys(filter).length > 0 ? filter : undefined;
+  }
+
   private loadAggregation(): void {
-    const aggregationFilter: MetricFilter = {
-      type: this.filter.type,
-      name: this.filter.name
-    };
+    const aggregationFilter = this.buildFilter(this.filter.type, this.filter.name);
     
     this.graphQLService.getMetricsAggregation(aggregationFilter)
       .pipe(takeUntil(this.destroy$))
@@ -336,15 +352,29 @@ export class DashboardComponent implements OnInit, OnDestroy {
           this.aggregation = agg;
         },
         error: (err) => {
-          console.error('Error loading aggregation:', err);
+          const appError = this.errorHandler.handleError(err);
+          console.error('Error loading aggregation:', appError);
+          this.aggregation = null;
         }
       });
   }
 
+  private isMetricInDateRange(metric: Metric): boolean {
+    const hasDateRange = this.chartDateRange.fromDate && this.chartDateRange.toDate;
+    if (!hasDateRange) {
+      return true;
+    }
+
+    const metricTime = new Date(metric.createdAt).getTime();
+    const fromTime = this.chartDateRange.fromDate!.getTime();
+    const toTime = this.chartDateRange.toDate!.getTime();
+    
+    return metricTime >= fromTime && metricTime <= toTime;
+  }
+
   refresh(): void {
-    // Clear accumulated chart data on refresh
     this.chartMetrics = [];
-    this.realTimeMetrics = []; // Also clear real-time metrics on manual refresh
+    this.realTimeMetrics = [];
     this.loadData();
     this.loadChartData();
   }

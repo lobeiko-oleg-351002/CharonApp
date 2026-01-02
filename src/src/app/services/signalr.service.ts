@@ -46,23 +46,31 @@ export class SignalRService {
   }
 
   async startConnection(): Promise<void> {
-    if (this.hubConnection?.state === HubConnectionState.Disconnected) {
-      try {
-        await this.hubConnection.start();
-        this.connectionStateSubject.next(true);
-        console.log('SignalR connection started');
-      } catch (error) {
-        console.error('Error starting SignalR connection:', error);
-        this.connectionStateSubject.next(false);
-      }
+    if (!this.hubConnection || this.hubConnection.state !== HubConnectionState.Disconnected) {
+      return;
+    }
+
+    try {
+      await this.hubConnection.start();
+      this.connectionStateSubject.next(true);
+    } catch (error) {
+      console.error('Error starting SignalR connection:', error);
+      this.connectionStateSubject.next(false);
+      throw error;
     }
   }
 
   async stopConnection(): Promise<void> {
-    if (this.hubConnection?.state !== HubConnectionState.Disconnected) {
-      await this.hubConnection?.stop();
+    if (!this.hubConnection || this.hubConnection.state === HubConnectionState.Disconnected) {
+      return;
+    }
+
+    try {
+      await this.hubConnection.stop();
       this.connectionStateSubject.next(false);
-      console.log('SignalR connection stopped');
+    } catch (error) {
+      console.error('Error stopping SignalR connection:', error);
+      throw error;
     }
   }
 }

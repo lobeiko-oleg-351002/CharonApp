@@ -1,20 +1,13 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, map, catchError } from 'rxjs';
-import { Metric, MetricFilter } from '../models/metric.model';
+import { Observable, map, catchError, expand, EMPTY, reduce, throwError } from 'rxjs';
+import { Metric, MetricFilter, DailyAverageMetric } from '../models/metric.model';
+import { BackendPagedResult } from '../models/api-response.model';
+import { APP_CONSTANTS } from '../constants/app.constants';
+import { ErrorHandlerService } from './error-handler.service';
 
-// Backend returns PagedResult with Items (capital I) - match C# naming
 export interface PagedResult<T> {
-  items: T[]; // Frontend uses lowercase for consistency
-  totalCount: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
-
-// Backend response format (C# naming)
-interface BackendPagedResult<T> {
-  items: T[]; // C# serializer converts Items to items in JSON
+  items: T[];
   totalCount: number;
   page: number;
   pageSize: number;
@@ -27,13 +20,16 @@ interface BackendPagedResult<T> {
 export class RestService {
   private readonly apiUrl = '/api/metrics';
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private errorHandler: ErrorHandlerService
+  ) {}
 
-  /**
-   * Get metrics with filters via REST API
-   * Use this for date-filtered queries to avoid GraphQL complexity issues
-   */
-  getMetrics(filter?: MetricFilter, page: number = 1, pageSize: number = 20): Observable<PagedResult<Metric>> {
+  getMetrics(
+    filter?: MetricFilter, 
+    page: number = APP_CONSTANTS.PAGINATION.DEFAULT_PAGE, 
+    pageSize: number = APP_CONSTANTS.PAGINATION.DEFAULT_PAGE_SIZE
+  ): Observable<PagedResult<Metric>> {
     let params = new HttpParams()
       .set('page', page.toString())
       .set('pageSize', pageSize.toString());
@@ -51,92 +47,83 @@ export class RestService {
       params = params.set('toDate', filter.toDate.toISOString());
     }
 
-    console.log(`REST API: GET ${this.apiUrl}`, params.toString());
-
-    return this.http.get<any>(this.apiUrl, { params })
+    return this.http.get<BackendPagedResult<Metric>>(this.apiUrl, { params })
       .pipe(
         map(result => {
-          console.log('REST API Response (raw):', result);
-          console.log('REST API Response type:', typeof result);
-          console.log('REST API Response keys:', result ? Object.keys(result) : 'null/undefined');
-          
           if (!result) {
-            console.error('REST API: Null or undefined response');
             throw new Error('Empty response from server');
           }
           
-          // Handle response - ASP.NET Core should serialize Items as items with camelCase
-          // But check both cases to be safe
-          const items = result.items || result.Items || [];
-          const response: PagedResult<Metric> = {
-            items: Array.isArray(items) ? items : [],
-            totalCount: result.totalCount || 0,
-            page: result.page || page,
-            pageSize: result.pageSize || pageSize,
-            totalPages: result.totalPages || 0
+          return {
+            items: Array.isArray(result.items) ? result.items : [],
+            totalCount: result.totalCount ?? 0,
+            page: result.page ?? page,
+            pageSize: result.pageSize ?? pageSize,
+            totalPages: result.totalPages ?? 0
           };
-          console.log('REST API Response (parsed):', response);
-          return response;
         }),
-        // Handle HTTP errors
-        catchError(error => {
-          console.error('REST API Error:', error);
-          console.error('REST API Error status:', error.status);
-          console.error('REST API Error statusText:', error.statusText);
-          console.error('REST API Error message:', error.message);
-          console.error('REST API Error url:', error.url);
-          
-          // Check if response is HTML instead of JSON
-          if (error.error && typeof error.error === 'string' && error.error.trim().startsWith('<!')) {
-            console.error('REST API returned HTML instead of JSON! Response:', error.error.substring(0, 200));
-            throw new Error('Server returned HTML instead of JSON. Check API endpoint URL and server configuration.');
-          }
-          
-          if (error.error) {
-            console.error('REST API Error body:', error.error);
-          }
-          throw error;
+        catchError((error: unknown) => {
+          const appError = this.errorHandler.handleError(error);
+          return throwError(() => appError);
         })
       );
   }
 
-  /**
-   * Get all metrics matching filter (with pagination)
-   * Fetches all pages automatically
-   */
-  getAllMetrics(filter?: MetricFilter, maxItems: number = 100): Observable<Metric[]> {
-    return new Observable(observer => {
-      const allMetrics: Metric[] = [];
-      let currentPage = 1;
-      const pageSize = 20;
+  getAllMetrics(
+    filter?: MetricFilter, 
+    maxItems: number = APP_CONSTANTS.PAGINATION.CHART_METRICS_LIMIT
+  ): Observable<Metric[]> {
+    const pageSize = APP_CONSTANTS.PAGINATION.DEFAULT_PAGE_SIZE;
+    
+    return this.getMetrics(filter, APP_CONSTANTS.PAGINATION.DEFAULT_PAGE, pageSize).pipe(
+      expand(result => {
+        const hasMorePages = result.page < result.totalPages;
+        const hasReachedLimit = result.items.length >= maxItems;
+        
+        if (!hasMorePages || hasReachedLimit) {
+          return EMPTY;
+        }
+        
+        return this.getMetrics(filter, result.page + 1, pageSize);
+      }),
+      reduce((acc: Metric[], result) => {
+        acc.push(...result.items);
+        return acc;
+      }, []),
+      map(allMetrics => allMetrics.slice(0, maxItems))
+    );
+  }
 
-      const fetchPage = () => {
-        this.getMetrics(filter, currentPage, pageSize).subscribe({
-          next: (result) => {
-            console.log(`REST API: Fetched page ${currentPage}, got ${result.items.length} items, total: ${result.totalCount}`);
-            allMetrics.push(...result.items);
+  getDailyAverages(
+    fromDate: Date,
+    toDate: Date,
+    filter?: MetricFilter
+  ): Observable<DailyAverageMetric[]> {
+    let params = new HttpParams()
+      .set('fromDate', fromDate.toISOString())
+      .set('toDate', toDate.toISOString());
 
-            // Continue fetching if there are more pages and we haven't reached maxItems
-            if (result.page < result.totalPages && allMetrics.length < maxItems) {
-              currentPage++;
-              fetchPage();
-            } else {
-              // Limit to maxItems
-              const limitedMetrics = allMetrics.slice(0, maxItems);
-              console.log(`REST API: Finished fetching, total: ${limitedMetrics.length} metrics`);
-              observer.next(limitedMetrics);
-              observer.complete();
-            }
-          },
-          error: (err) => {
-            console.error('REST API Error:', err);
-            observer.error(err);
+    if (filter?.type) {
+      params = params.set('type', filter.type);
+    }
+    if (filter?.name) {
+      params = params.set('name', filter.name);
+    }
+
+    return this.http.get<DailyAverageMetric[]>(`${this.apiUrl}/daily-averages`, { params })
+      .pipe(
+        map(result => {
+          if (!result) {
+            throw new Error('Empty response from server');
           }
-        });
-      };
-
-      fetchPage();
-    });
+          
+          return Array.isArray(result) ? result : [];
+        }),
+        catchError((error: unknown) => {
+          const appError = this.errorHandler.handleError(error);
+          return throwError(() => appError);
+        })
+      );
   }
 }
 
