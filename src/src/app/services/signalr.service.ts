@@ -9,9 +9,11 @@ import { Metric } from '../models/metric.model';
 export class SignalRService {
   private hubConnection?: HubConnection;
   private metricSubject = new BehaviorSubject<Metric | null>(null);
+  private dataUpdatedSubject = new BehaviorSubject<boolean>(false);
   private connectionStateSubject = new BehaviorSubject<boolean>(false);
 
   public metricReceived$: Observable<Metric | null> = this.metricSubject.asObservable();
+  public dataUpdated$: Observable<boolean> = this.dataUpdatedSubject.asObservable();
   public isConnected$: Observable<boolean> = this.connectionStateSubject.asObservable();
 
   constructor() {
@@ -33,7 +35,13 @@ export class SignalRService {
     });
 
     this.hubConnection.on('MetricReceived', (metric: Metric) => {
+      // Receive actual metric data for instant Latest Values update
       this.metricSubject.next(metric);
+    });
+
+    this.hubConnection.on('DataUpdated', () => {
+      // Notify that data has been updated - frontend will fetch chart/aggregations via GraphQL
+      this.dataUpdatedSubject.next(true);
     });
   }
 

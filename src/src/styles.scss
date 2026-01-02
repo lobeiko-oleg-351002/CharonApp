@@ -39,3 +39,242 @@ code {
   background: #6b3d7a;
 }
 
+// Angular Material Theme Override for Dark Theme
+@import '@angular/material/prebuilt-themes/indigo-pink.css';
+
+// Custom Material Datepicker Dark Theme
+.mat-mdc-form-field {
+  --mdc-outlined-text-field-container-shape: 6px;
+}
+
+.mat-calendar {
+  background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(45, 27, 61, 0.95) 100%) !important;
+  color: #e5e7eb !important;
+  border: 1px solid rgba(212, 175, 55, 0.3) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 20px rgba(212, 175, 55, 0.1) !important;
+  backdrop-filter: blur(10px);
+}
+
+.mat-calendar-header {
+  background: rgba(45, 27, 61, 0.8) !important;
+  color: #d4af37 !important;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.3) !important;
+  padding: 8px 0 !important;
+}
+
+.mat-calendar-body-label {
+  color: #e5e7eb !important;
+}
+
+// Calendar table header (day names)
+.mat-calendar-table-header,
+.mat-calendar-table-header th {
+  color: #d4af37 !important;
+  font-weight: 600 !important;
+  padding: 8px 0 !important;
+}
+
+// Navigation buttons (previous/next month) - Material 16
+.mat-calendar-previous-button,
+.mat-calendar-next-button,
+button.mat-calendar-previous-button,
+button.mat-calendar-next-button,
+.mat-calendar .mat-calendar-header .mat-calendar-previous-button,
+.mat-calendar .mat-calendar-header .mat-calendar-next-button {
+  color: #d4af37 !important;
+  background: rgba(212, 175, 55, 0.15) !important;
+  border-radius: 50% !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  padding: 0 !important;
+  margin: 0 8px !important;
+  transition: all 0.2s ease !important;
+  border: 1px solid rgba(212, 175, 55, 0.3) !important;
+
+  .mat-icon {
+    color: #d4af37 !important;
+    font-size: 24px !important;
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  &:hover:not(:disabled) {
+    background: rgba(212, 175, 55, 0.35) !important;
+    color: #f4d03f !important;
+    transform: scale(1.15) !important;
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.5) !important;
+    border-color: rgba(212, 175, 55, 0.6) !important;
+
+    .mat-icon {
+      color: #f4d03f !important;
+    }
+  }
+
+  &:active:not(:disabled) {
+    background: rgba(212, 175, 55, 0.5) !important;
+    transform: scale(1.08) !important;
+  }
+
+  &:disabled {
+    color: rgba(212, 175, 55, 0.25) !important;
+    background: rgba(212, 175, 55, 0.05) !important;
+    border-color: rgba(212, 175, 55, 0.1) !important;
+    cursor: not-allowed !important;
+
+    .mat-icon {
+      color: rgba(212, 175, 55, 0.25) !important;
+    }
+  }
+
+  &:focus {
+    outline: 2px solid rgba(212, 175, 55, 0.5) !important;
+    outline-offset: 2px !important;
+  }
+}
+
+// Period button (month/year selector)
+.mat-calendar-period-button,
+button.mat-calendar-period-button {
+  color: #d4af37 !important;
+  font-weight: 600 !important;
+  font-size: 1rem !important;
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+
+  &:hover {
+    background: rgba(212, 175, 55, 0.2) !important;
+    color: #f4d03f !important;
+    border-color: rgba(212, 175, 55, 0.4) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 6px rgba(212, 175, 55, 0.3) !important;
+  }
+
+  &:focus {
+    background: rgba(212, 175, 55, 0.25) !important;
+    outline: 2px solid rgba(212, 175, 55, 0.6) !important;
+    outline-offset: 2px !important;
+  }
+
+  &:active {
+    background: rgba(212, 175, 55, 0.3) !important;
+    transform: translateY(0) !important;
+  }
+}
+
+.mat-calendar-body-cell-content {
+  color: #e5e7eb !important;
+  border-color: rgba(212, 175, 55, 0.2) !important;
+
+  &:hover {
+    background: rgba(212, 175, 55, 0.2) !important;
+    color: #d4af37 !important;
+  }
+}
+
+.mat-calendar-body-selected {
+  background: linear-gradient(135deg, #4a2c5a 0%, #6b3d7a 100%) !important;
+  color: #d4af37 !important;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3) !important;
+}
+
+.mat-calendar-body-today:not(.mat-calendar-body-selected) {
+  border-color: rgba(212, 175, 55, 0.5) !important;
+}
+
+.mat-calendar-body-disabled {
+  color: rgba(229, 231, 235, 0.3) !important;
+}
+
+.mat-calendar-arrow {
+  border-top-color: #d4af37 !important;
+}
+
+.mat-datepicker-toggle-active {
+  color: #d4af37 !important;
+
+  .mat-icon {
+    color: #d4af37 !important;
+  }
+}
+
+// Datepicker toggle button styling (icon button)
+.mat-datepicker-toggle,
+.mat-mdc-form-field-icon-suffix {
+  color: #d4af37 !important;
+
+  .mat-icon-button,
+  .mat-mdc-icon-button {
+    color: #d4af37 !important;
+    background: transparent !important;
+
+    .mat-icon,
+    .mat-mdc-button-persistent-ripple {
+      color: #d4af37 !important;
+    }
+  }
+
+  .mat-icon {
+    color: #d4af37 !important;
+    font-size: 24px !important;
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  &:hover {
+    .mat-icon-button,
+    .mat-mdc-icon-button {
+      background: rgba(212, 175, 55, 0.15) !important;
+      color: #f4d03f !important;
+
+      .mat-icon {
+        color: #f4d03f !important;
+      }
+    }
+
+    .mat-icon {
+      color: #f4d03f !important;
+    }
+  }
+
+  &:active {
+    .mat-icon-button,
+    .mat-mdc-icon-button {
+      background: rgba(212, 175, 55, 0.25) !important;
+    }
+  }
+}
+
+// Make datepicker input fields brighter
+.mat-mdc-form-field {
+  .mdc-text-field__input {
+    color: #ffffff !important;
+    font-weight: 500 !important;
+  }
+
+  .mat-mdc-form-field-label,
+  .mdc-floating-label {
+    color: #d4af37 !important;
+    font-weight: 600 !important;
+  }
+
+  .mdc-floating-label--float-above {
+    color: #d4af37 !important;
+    background: rgba(45, 27, 61, 0.95) !important;
+  }
+
+  &.mat-focused {
+    .mdc-text-field__input {
+      color: #ffffff !important;
+    }
+
+    .mat-mdc-form-field-label,
+    .mdc-floating-label {
+      color: #d4af37 !important;
+    }
+  }
+}
+

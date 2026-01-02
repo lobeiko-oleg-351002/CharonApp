@@ -14,6 +14,7 @@ import { Metric } from '../../models/metric.model';
 export class MetricsChartComponent implements OnInit, OnChanges {
   @Input() metrics: Metric[] = [];
   @Input() loading = false;
+  @Input() dateRange?: { fromDate?: Date; toDate?: Date };
 
   chartType: ChartType = 'line';
   chartData: ChartData<'line'> = {
@@ -25,16 +26,40 @@ export class MetricsChartComponent implements OnInit, OnChanges {
     maintainAspectRatio: false,
     scales: {
       y: {
-        beginAtZero: true
+        beginAtZero: true,
+        ticks: {
+          color: '#e5e7eb'
+        },
+        grid: {
+          color: 'rgba(212, 175, 55, 0.1)'
+        }
+      },
+      x: {
+        ticks: {
+          color: '#e5e7eb',
+          maxRotation: 45,
+          minRotation: 45
+        },
+        grid: {
+          color: 'rgba(212, 175, 55, 0.1)'
+        }
       }
     },
     plugins: {
       legend: {
         display: true,
-        position: 'top'
+        position: 'top',
+        labels: {
+          color: '#e5e7eb'
+        }
       },
       tooltip: {
-        enabled: true
+        enabled: true,
+        backgroundColor: 'rgba(45, 27, 61, 0.95)',
+        titleColor: '#d4af37',
+        bodyColor: '#e5e7eb',
+        borderColor: 'rgba(212, 175, 55, 0.3)',
+        borderWidth: 1
       }
     }
   };
@@ -44,7 +69,7 @@ export class MetricsChartComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['metrics']) {
+    if (changes['metrics'] || changes['dateRange']) {
       this.updateChart();
     }
   }
@@ -58,11 +83,66 @@ export class MetricsChartComponent implements OnInit, OnChanges {
       return;
     }
 
-    const typeGroups = this.groupByType(this.metrics);
-    const labels = this.metrics
+    // Filter metrics by date range if provided
+    let filteredMetrics = this.metrics;
+    if (this.dateRange) {
+      filteredMetrics = this.metrics.filter(m => {
+        const metricDate = new Date(m.createdAt);
+        if (this.dateRange!.fromDate && metricDate < this.dateRange!.fromDate) {
+          return false;
+        }
+        if (this.dateRange!.toDate && metricDate > this.dateRange!.toDate) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    if (filteredMetrics.length === 0) {
+      this.chartData = {
+        labels: [],
+        datasets: []
+      };
+      return;
+    }
+
+    const typeGroups = this.groupByType(filteredMetrics);
+    
+    // Sort by date and create labels based on date range
+    const sortedMetrics = filteredMetrics
       .slice()
-      .reverse()
-      .map(m => new Date(m.createdAt).toLocaleTimeString());
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    
+    // Format labels based on date range span
+    const labels = sortedMetrics.map(m => {
+      const date = new Date(m.createdAt);
+      if (this.dateRange?.fromDate && this.dateRange?.toDate) {
+        const span = this.dateRange.toDate.getTime() - this.dateRange.fromDate.getTime();
+        const days = span / (1000 * 60 * 60 * 24);
+        
+        if (days > 1) {
+          // Show date and time for multi-day ranges
+          return date.toLocaleString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          });
+        } else {
+          // Show time only for same-day ranges
+          return date.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            second: '2-digit'
+          });
+        }
+      }
+      return date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    });
 
     const datasets = Object.entries(typeGroups).map(([type, metrics], index) => {
       const colors = [
@@ -76,17 +156,14 @@ export class MetricsChartComponent implements OnInit, OnChanges {
 
       return {
         label: type,
-        data: this.metrics
-          .slice()
-          .reverse()
-          .map(m => {
-            if (m.type === type && m.payload) {
-              const firstKey = Object.keys(m.payload)[0];
-              const value = m.payload[firstKey];
-              return typeof value === 'number' ? value : 0;
-            }
-            return null;
-          }),
+        data: sortedMetrics.map(m => {
+          if (m.type === type && m.payload) {
+            const firstKey = Object.keys(m.payload)[0];
+            const value = m.payload[firstKey];
+            return typeof value === 'number' ? value : 0;
+          }
+          return null;
+        }),
         borderColor: color,
         backgroundColor: color.replace('1)', '0.1)'),
         tension: 0.4,

@@ -19,6 +19,7 @@
     "@angular/platform-browser-dynamic": "^16.2.0",
     "@angular/router": "^16.2.0",
     "@angular/cdk": "^16.2.0",
+    "@angular/material": "^16.2.0",
     "@apollo/client": "^3.8.10",
     "apollo-angular": "^5.0.0",
     "graphql": "^16.8.1",

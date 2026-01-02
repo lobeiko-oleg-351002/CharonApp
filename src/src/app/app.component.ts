@@ -22,7 +22,14 @@ export class AppComponent implements OnInit, OnDestroy {
     this.signalRService.metricReceived$
       .pipe(takeUntil(this.destroy$))
       .subscribe(metric => {
-        console.log('New metric received:', metric);
+        if (metric) {
+          console.log('New metric received via SignalR:', metric);
+        }
+      });
+    this.signalRService.dataUpdated$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        console.log('Data updated notification received');
       });
   }
 

@@ -28,8 +28,9 @@
     <div class="dashboard-card chart-card">
       <h3>Metrics Chart</h3>
       <app-metrics-chart
-        [metrics]="latestMetrics"
-        [loading]="loading">
+        [metrics]="chartMetrics"
+        [loading]="loading"
+        [dateRange]="chartDateRange">
       </app-metrics-chart>
     </div>
 

@@ -13,13 +13,18 @@ function createApollo(httpLink: HttpLink): ApolloClientOptions<any> {
     link: httpLink.create({
       uri: '/graphql',
     }),
-    cache: new InMemoryCache(),
+    cache: new InMemoryCache({
+      // Disable cache to prevent old queries from being executed
+      addTypename: false,
+    }),
     defaultOptions: {
       watchQuery: {
         errorPolicy: 'all',
+        fetchPolicy: 'no-cache', // Disable cache
       },
       query: {
         errorPolicy: 'all',
+        fetchPolicy: 'no-cache', // Disable cache
       },
     },
   };
