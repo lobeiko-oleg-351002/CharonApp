@@ -1,0 +1,12 @@
+<div class="multi-series-chart-container">
+  <div *ngIf="loading" class="loading">Loading...</div>
+  <div *ngIf="!loading && (!metrics || metrics.length === 0)" class="no-data">
+    No data available
+  </div>
+  <canvas *ngIf="!loading && metrics && metrics.length > 0" baseChart
+    [data]="chartData"
+    [options]="chartOptions"
+    [type]="chartType">
+  </canvas>
+</div>
+

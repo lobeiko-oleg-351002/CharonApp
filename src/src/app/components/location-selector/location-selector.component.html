@@ -1,0 +1,14 @@
+<div class="location-selector">
+  <label for="location-select">Location:</label>
+  <select 
+    id="location-select"
+    [ngModel]="selectedLocation || allLocationsOption"
+    (ngModelChange)="onLocationChange($event)"
+    class="location-select">
+    <option [value]="allLocationsOption">{{ allLocationsOption }}</option>
+    <option *ngFor="let location of availableLocations" [value]="location">
+      {{ location }}
+    </option>
+  </select>
+</div>
+

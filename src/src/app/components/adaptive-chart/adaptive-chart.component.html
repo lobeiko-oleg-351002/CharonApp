@@ -1,0 +1,29 @@
+<div class="adaptive-chart-container">
+  <!-- Binary Timeline for motion -->
+  <app-binary-timeline-chart
+    *ngIf="visualizationType === 'binary'"
+    [metrics]="metrics"
+    [loading]="loading"
+    [dateRange]="dateRange"
+    [location]="location">
+  </app-binary-timeline-chart>
+
+  <!-- Multi-series for air_quality -->
+  <app-multi-series-chart
+    *ngIf="visualizationType === 'multi-series'"
+    [metrics]="metrics"
+    [loading]="loading"
+    [dateRange]="dateRange"
+    [location]="location"
+    [payloadKeys]="config?.payloadKeys || []">
+  </app-multi-series-chart>
+
+  <!-- Standard line chart for energy and other types -->
+  <app-metrics-chart
+    *ngIf="visualizationType === 'line' || visualizationType === 'bar'"
+    [metrics]="metrics"
+    [loading]="loading"
+    [dateRange]="dateRange">
+  </app-metrics-chart>
+</div>
+

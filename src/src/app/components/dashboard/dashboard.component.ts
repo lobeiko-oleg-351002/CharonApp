@@ -12,6 +12,9 @@ import { MetricsChartComponent } from '../metrics-chart/metrics-chart.component'
 import { AggregationsComponent } from '../aggregations/aggregations.component';
 import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
 import { DailyAveragesTableComponent } from '../daily-averages-table/daily-averages-table.component';
+import { LocationSelectorComponent } from '../location-selector/location-selector.component';
+import { AdaptiveChartComponent } from '../adaptive-chart/adaptive-chart.component';
+import { getMetricTypeConfig } from '../../models/metric-type-config.model';
 import { APP_CONSTANTS } from '../../constants/app.constants';
 
 @Component({
@@ -24,7 +27,9 @@ import { APP_CONSTANTS } from '../../constants/app.constants';
     MetricsChartComponent,
     AggregationsComponent,
     FilterPanelComponent,
-    DailyAveragesTableComponent
+    DailyAveragesTableComponent,
+    LocationSelectorComponent,
+    AdaptiveChartComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
@@ -39,6 +44,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   error: string | null = null;
   filter: MetricFilter = {};
   chartDateRange: { fromDate?: Date; toDate?: Date } = {}; // Separate date range for chart
+  selectedLocation: string | null = null; // Selected location for filtering charts
+  
+  // Grouped metrics by type for adaptive charts
+  metricsByType: Record<string, Metric[]> = {};
 
   private destroy$ = new Subject<void>();
 
@@ -57,6 +66,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       const appError = this.errorHandler.handleError(err);
       console.error('Failed to start SignalR connection:', appError);
     });
+    // Initialize metrics grouping (will be updated when data loads)
+    this.groupMetricsByType();
   }
 
   ngOnDestroy(): void {
@@ -92,6 +103,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
               .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
             // Merge with any existing real-time metrics from SignalR
             this.updateChartFromRealTimeMetrics();
+            // Group metrics by type for adaptive charts
+            this.groupMetricsByType();
           }
           
           this.loading = false;
@@ -114,11 +127,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
         name: this.filter.name
       };
 
-      // Ensure dates are at start/end of day for proper filtering
-      const fromDate = new Date(this.chartDateRange.fromDate);
-      fromDate.setHours(0, 0, 0, 0);
-      const toDate = new Date(this.chartDateRange.toDate);
-      toDate.setHours(23, 59, 59, 999);
+      // Ensure dates are at start/end of day in UTC to avoid timezone issues
+      // Use UTC methods to preserve the selected date regardless of local timezone
+      const fromDate = new Date(Date.UTC(
+        this.chartDateRange.fromDate.getFullYear(),
+        this.chartDateRange.fromDate.getMonth(),
+        this.chartDateRange.fromDate.getDate(),
+        0, 0, 0, 0
+      ));
+      const toDate = new Date(Date.UTC(
+        this.chartDateRange.toDate.getFullYear(),
+        this.chartDateRange.toDate.getMonth(),
+        this.chartDateRange.toDate.getDate(),
+        23, 59, 59, 999
+      ));
 
       this.restService.getDailyAverages(
         fromDate,
@@ -132,6 +154,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
             // Convert daily averages to metrics format for chart display
             // For date-filtered queries, show ONLY daily averages, no real-time metrics
             this.chartMetrics = this.convertDailyAveragesToMetrics(dailyAverages);
+            // Group metrics by type for adaptive charts
+            this.groupMetricsByType();
           },
           error: (err) => {
             const appError = this.errorHandler.handleError(err);
@@ -146,6 +170,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.dailyAverages = [];
       // Chart metrics are already set in loadData() from GraphQL
       // SignalR will add new metrics via updateChartFromRealTimeMetrics()
+      // Grouping is done in loadData() and updateChartFromRealTimeMetrics()
     }
   }
 
@@ -201,6 +226,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const uniqueMetrics = this.deduplicateMetrics(allMetrics);
     
     this.chartMetrics = this.sortMetricsByDate(uniqueMetrics);
+    // Regroup metrics by type after merging
+    this.groupMetricsByType();
   }
 
   private deduplicateMetrics(metrics: Metric[]): Metric[] {
@@ -307,6 +334,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     
     this.chartMetrics = [];
     this.dailyAverages = [];
+    this.metricsByType = {};
+    this.selectedLocation = null; // Reset location filter on filter change
     this.loadData();
     this.loadChartData();
   }
@@ -375,8 +404,39 @@ export class DashboardComponent implements OnInit, OnDestroy {
   refresh(): void {
     this.chartMetrics = [];
     this.realTimeMetrics = [];
+    this.metricsByType = {};
+    this.selectedLocation = null;
     this.loadData();
     this.loadChartData();
+  }
+
+  private groupMetricsByType(): void {
+    this.metricsByType = {};
+    this.chartMetrics.forEach(metric => {
+      if (!this.metricsByType[metric.type]) {
+        this.metricsByType[metric.type] = [];
+      }
+      this.metricsByType[metric.type].push(metric);
+    });
+  }
+
+  getMetricTypes(): string[] {
+    return Object.keys(this.metricsByType).sort();
+  }
+
+  getMetricsForType(type: string): Metric[] {
+    let metrics = this.metricsByType[type] || [];
+    
+    // Filter by location if selected
+    if (this.selectedLocation) {
+      metrics = metrics.filter(m => m.name === this.selectedLocation);
+    }
+    
+    return metrics;
+  }
+
+  onLocationChange(location: string | null): void {
+    this.selectedLocation = location;
   }
 }
 

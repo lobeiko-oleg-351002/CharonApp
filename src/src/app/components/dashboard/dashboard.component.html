@@ -26,12 +26,32 @@
     </div>
 
     <div class="dashboard-card chart-card">
-      <h3>Metrics Chart</h3>
-      <app-metrics-chart
+      <h3>Metrics Charts</h3>
+      
+      <!-- Location Selector -->
+      <app-location-selector
         [metrics]="chartMetrics"
-        [loading]="loading"
-        [dateRange]="chartDateRange">
-      </app-metrics-chart>
+        [selectedLocation]="selectedLocation"
+        (locationChange)="onLocationChange($event)">
+      </app-location-selector>
+
+      <!-- Adaptive Charts by Type -->
+      <div class="charts-container">
+        <div *ngFor="let type of getMetricTypes()" class="chart-by-type">
+          <h4 class="chart-type-title">{{ type.toUpperCase() }}</h4>
+          <app-adaptive-chart
+            [metrics]="getMetricsForType(type)"
+            [loading]="loading"
+            [dateRange]="chartDateRange"
+            [location]="selectedLocation"
+            [metricType]="type">
+          </app-adaptive-chart>
+        </div>
+        
+        <div *ngIf="getMetricTypes().length === 0 && !loading" class="no-charts">
+          No metrics available for charts
+        </div>
+      </div>
     </div>
 
     <div class="dashboard-card aggregations-card">
