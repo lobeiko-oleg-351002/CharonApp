@@ -79,6 +79,33 @@
   grid-column: span 1;
 }
 
+.charts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  margin-top: 1rem;
+
+  .chart-by-type {
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+    background: rgba(45, 27, 61, 0.3);
+
+    .chart-type-title {
+      color: #d4af37;
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+  }
+
+  .no-charts {
+    text-align: center;
+    color: #e5e7eb;
+    padding: 2rem;
+  }
+}
+
 .chart-card {
   grid-column: span 1;
 }

@@ -1,0 +1,39 @@
+.location-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+
+  label {
+    color: #d4af37;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .location-select {
+    flex: 1;
+    padding: 0.5rem;
+    background: rgba(45, 27, 61, 0.8);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 4px;
+    color: #e5e7eb;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+
+    &:hover {
+      border-color: rgba(212, 175, 55, 0.5);
+    }
+
+    &:focus {
+      outline: none;
+      border-color: #d4af37;
+    }
+
+    option {
+      background: rgba(45, 27, 61, 0.95);
+      color: #e5e7eb;
+    }
+  }
+}
+
